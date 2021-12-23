@@ -18,7 +18,8 @@ from spacy.util import minibatch
 from torch.utils.data import DataLoader, random_split
 from pytorch_lightning.callbacks.base import Callback
 
-from models import bert, lstm_glove, lstm_toy, roberta, t5, gpt2
+# from models import bert, lstm_glove, lstm_toy, roberta, t5, gpt2
+from models import lstm_toy
 
 
 @plac.opt(
@@ -55,12 +56,11 @@ from models import bert, lstm_glove, lstm_toy, roberta, t5, gpt2
 @plac.opt(
     "rate",
     type=float,
-    help=(
-        "This is the co-occurence rate between the counter examples and the labels"
-        "We generate data for rates {0., 0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999, 1.0}."
-        "We use a rate=-1. when the task is `probing` as a filler value"
-        "but its not used or checked, so anything is fine."
-    ),
+    help=
+    ("This is the co-occurence rate between the counter examples and the labels"
+     "We generate data for rates {0., 0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999, 1.0}."
+     "We use a rate=-1. when the task is `probing` as a filler value"
+     "but its not used or checked, so anything is fine."),
 )
 @plac.opt(
     "probe",
@@ -68,16 +68,20 @@ from models import bert, lstm_glove, lstm_toy, roberta, t5, gpt2
     choices=["strong", "weak", "n/a", "strong_direct", "msgs"],
     abbrev="prb",
 )
-@plac.opt("task", "which mode/task we're doing", choices=["probing", "finetune"])
+@plac.opt("task",
+          "which mode/task we're doing",
+          choices=["probing", "finetune"])
 @plac.opt(
-    "model", "which model to use; use a hugging face model.",
+    "model",
+    "which model to use; use a hugging face model.",
 )
 @plac.opt(
-    "seed", "which rand seed to use", type=int,
+    "seed",
+    "which rand seed to use",
+    type=int,
 )
-@plac.opt(
-    "wandb_entity", "wandb entity. set WANDB_API_KEY (in script or bashrc) to use."
-)
+@plac.opt("wandb_entity",
+          "wandb entity. set WANDB_API_KEY (in script or bashrc) to use.")
 def main(
     prop="sva",
     rate=0,
@@ -148,13 +152,17 @@ def main(
     # NOTE: Set `entity` to your wandb username, and add a line
     # to your `.bashrc` (or whatever) exporting your wandb key.
     # `export WANDB_API_KEY=62831853071795864769252867665590057683943`.
-    config = dict(prop=prop, rate=rate, probe=probe, task=task, model=model, seed=seed)
+    config = dict(prop=prop,
+                  rate=rate,
+                  probe=probe,
+                  task=task,
+                  model=model,
+                  seed=seed)
 
     wandb_logger = WandbLogger(entity=wandb_entity, project="features")
     wandb_logger.log_hyperparams(config)
     train_data, eval_data, test_data = load_data(
-        prop, path, label_col, [positive_label, negative_label]
-    )
+        prop, path, label_col, [positive_label, negative_label])
     num_steps = (len(train_data) // batch_size) * num_epochs
     datamodule = DataModule(batch_size, train_data, eval_data, test_data)
 
@@ -193,22 +201,26 @@ def main(
     test_df = pd.read_table(f"./properties/{prop}/test.tsv")
     test_df["pred"] = test_pred
     test_df.to_csv(
-        f"results/raw/{title}.tsv", sep="\t", index=False,
+        f"results/raw/{title}.tsv",
+        sep="\t",
+        index=False,
     )
 
     # Additional evaluation.
     if task == "finetune":
         additional_results = finetune_evaluation(test_df, label_col)
     elif task == "probing":
-        additional_results, block_logs = compute_mdl(
-            train_data, model, batch_size, num_epochs, accumulate_grad_batches
-        )
+        additional_results, block_logs = compute_mdl(train_data, model,
+                                                     batch_size, num_epochs,
+                                                     accumulate_grad_batches)
         block_logs_df = pd.DataFrame(block_logs)
         # block_logs_df["section"] = (est_df.section.iloc[0],)
         for k, v in config.items():
             block_logs_df[k] = v
         block_logs_df.to_csv(
-            f"./results/raw/block-{title}.tsv", sep="\t", index=False,
+            f"./results/raw/block-{title}.tsv",
+            sep="\t",
+            index=False,
         )
     else:
         # For the toy data, this takes SO long. I have to look into it.
@@ -224,19 +236,19 @@ def main(
     #        **additional_results,
     #    }
     # )
-    pd.DataFrame(
-        [
-            {
-                # NOTE: `loss_auc` is not tracked when finetuning.
-                "val_loss_auc": lossauc.get(),
-                **test_result,
-                **additional_results,
-                **config,  # log results for easy post processing in pandas, etc.
-                "section": test_df.section.iloc[0],
-            }
-        ]
-    ).to_csv(
-        f"./results/stats/{title}.tsv", sep="\t", index=False,
+    pd.DataFrame([{
+        # NOTE: `loss_auc` is not tracked when finetuning.
+        "val_loss_auc":
+        lossauc.get(),
+        **test_result,
+        **additional_results,
+        **config,  # log results for easy post processing in pandas, etc.
+        "section":
+        test_df.section.iloc[0],
+    }]).to_csv(
+        f"./results/stats/{title}.tsv",
+        sep="\t",
+        index=False,
     )
 
 
@@ -264,16 +276,10 @@ def prepare_labels_spacy(labels, categories):
 def load_data(prop, path, label_col, categories):
     """Load data from the IMDB dataset, splitting off a held-out set."""
     # SHUFFLE
-    trn = (
-        pd.read_table(f"./properties/{prop}/{path}_train.tsv")
-        .sample(frac=1)
-        .reset_index(drop=True)
-    )
-    val = (
-        pd.read_table(f"./properties/{prop}/{path}_val.tsv")
-        .sample(frac=1)
-        .reset_index(drop=True)
-    )
+    trn = (pd.read_table(f"./properties/{prop}/{path}_train.tsv").sample(
+        frac=1).reset_index(drop=True))
+    val = (pd.read_table(f"./properties/{prop}/{path}_val.tsv").sample(
+        frac=1).reset_index(drop=True))
     # NO SHUFFLE (so we can re-align the results with the input data.)
     tst = pd.read_table(f"./properties/{prop}/test.tsv")
 
@@ -335,7 +341,8 @@ def finetune_evaluation(df, label_col):
     """
     df["error"] = df["pred"] != df[label_col]
     # For "weak_feature", we mean the `weak_feature` is present in the example.
-    df["weak_feature"] = ((df.section == "both") | (df.section == "weak")).astype(int)
+    df["weak_feature"] = ((df.section == "both") |
+                          (df.section == "weak")).astype(int)
     both = df[df.section == "both"]
     neither = df[df.section == "neither"]
     strong = df[df.section == "strong"]
@@ -374,12 +381,13 @@ def random_split_partition(zipped_list, sizes):
     neg = [z for z in zipped_list if z[1] not in {1, "1", "yes"}]
     interleaved_list = list(itertools.chain(*zip(pos, neg)))
     return [
-        interleaved_list[end - length : end]
+        interleaved_list[end - length:end]
         for end, length in zip(itertools.accumulate(sizes), sizes)
     ]
 
 
-def compute_mdl(train_data, model, batch_size, num_epochs, accumulate_grad_batches):
+def compute_mdl(train_data, model, batch_size, num_epochs,
+                accumulate_grad_batches):
     """Computes the Minimum Description Length (MDL) over the training data given the model.
 
     We use *prequential* MDL.
@@ -396,15 +404,15 @@ def compute_mdl(train_data, model, batch_size, num_epochs, accumulate_grad_batch
     # the second will be the concatenation of the first two, and so on. This is to take advantage
     # of the random_split function.
     split_proportions = np.array(
-        [0.1, 0.1, 0.2, 0.4, 0.8, 1.6, 3.05, 6.25, 12.5, 25, 50]
-    )
+        [0.1, 0.1, 0.2, 0.4, 0.8, 1.6, 3.05, 6.25, 12.5, 25, 50])
     split_sizes = np.ceil(0.01 * len(train_data) * split_proportions)
 
     # How much did we overshoot by? We'll just take this from the longest split
     extra = np.sum(split_sizes) - len(train_data)
     split_sizes[len(split_proportions) - 1] -= extra
 
-    splits = random_split_partition(train_data, split_sizes.astype(int).tolist())
+    splits = random_split_partition(train_data,
+                                    split_sizes.astype(int).tolist())
     mdls = []
     block_logs = []
 
@@ -417,13 +425,12 @@ def compute_mdl(train_data, model, batch_size, num_epochs, accumulate_grad_batch
         last_block = i == (len(splits) - 1)
 
         # setup the train and test split.
-        train_split = list(itertools.chain.from_iterable(splits[0 : i + 1]))
+        train_split = list(itertools.chain.from_iterable(splits[0:i + 1]))
         test_split = train_split if last_block else splits[i + 1]
 
         # re-fresh model.
-        datamodule = DataModule(
-            batch_size, train_split, test_split[:batch_size], test_split
-        )
+        datamodule = DataModule(batch_size, train_split,
+                                test_split[:batch_size], test_split)
         num_steps = (len(train_split) // batch_size) * num_epochs
         classifier = load_model(model, num_steps)
         trainer = Trainer(
@@ -440,9 +447,10 @@ def compute_mdl(train_data, model, batch_size, num_epochs, accumulate_grad_batch
         # Test
         test_result = trainer.test(datamodule=datamodule)
         test_loss = test_result[0]["test_loss"]
-        block_logs.append(
-            {"length": len(test_split), "loss": test_loss,}
-        )
+        block_logs.append({
+            "length": len(test_split),
+            "loss": test_loss,
+        })
 
         if not last_block:
             mdls.append(test_loss)
@@ -453,7 +461,11 @@ def compute_mdl(train_data, model, batch_size, num_epochs, accumulate_grad_batch
     data_cost = test_loss
     model_cost = total_mdl - data_cost
     return (
-        {"total_mdl": total_mdl, "data_cost": data_cost, "model_cost": model_cost,},
+        {
+            "total_mdl": total_mdl,
+            "data_cost": data_cost,
+            "model_cost": model_cost,
+        },
         block_logs,
     )
 
@@ -467,13 +479,19 @@ class DataModule(pl.LightningDataModule):
         self.batch_size = batch_size
 
     def train_dataloader(self):
-        return DataLoader(self.train_data, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(self.train_data,
+                          batch_size=self.batch_size,
+                          shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(self.eval_data, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(self.eval_data,
+                          batch_size=self.batch_size,
+                          shuffle=True)
 
     def test_dataloader(self):
-        return DataLoader(self.test_data, batch_size=self.batch_size, shuffle=False)
+        return DataLoader(self.test_data,
+                          batch_size=self.batch_size,
+                          shuffle=False)
 
 
 class LossAuc(Callback):
@@ -482,9 +500,11 @@ class LossAuc(Callback):
         self.losses = []
 
     def on_validation_epoch_end(self, trainer, pl_module):
-        if trainer.running_sanity_check:
-            return
-        self.losses.append(trainer.callback_metrics["val_loss"])
+        # if trainer.running_sanity_check:
+        #     return
+        # print(trainer.callback_metrics)
+        # self.losses.append(trainer.callback_metrics["val_loss"])
+        pass
 
     def get(self):
         if len(self.losses) == 0:
